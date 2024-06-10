@@ -4,20 +4,8 @@
   hosts: all
   gather_facts: no
   tasks:
-    # Check if 7-Zip executable exists
-    - name: Check if 7-Zip executable exists
-      win_command: 'where /R C:\ 7z.exe'
-      register: check_7zip_exe
-      ignore_errors: true
-
-    # Check if 7-Zip is listed in registry
-    - name: Check if 7-Zip is listed in registry
-      win_shell: 'reg query "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /s /f "7-Zip"'
-      register: check_7zip_reg
-      ignore_errors: true
-
-    # Uninstall 7-Zip if found
-    - name: Uninstall existing version of 7-Zip
+    # Uninstall 7-Zip if it exists
+    - name: Uninstall 7-Zip if it exists
       win_package:
-        name: 7-Zip 19.00 (x64 edition)
+        name: 7-Zip  # Replace with the actual display name of 7-Zip in the "Programs and Features" list
         state: absent
