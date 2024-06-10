@@ -1,20 +1,37 @@
 ---
 # Install 7-zip with win_package
-- name: Downlaod and install 7zip
+
+# Define the playbook to download and install 7-Zip
+- name: Download and install 7zip
+
+  # Define the hosts where the tasks will be executed
   hosts: all
+
+  # Disable gathering facts to improve performance
   gather_facts: no
+
+  # List of tasks to execute
   tasks:
+    # Ensure that the temporary folder exists
     - name: Ensure temporary folder exists
       win_file:
         path: C:\temp
         state: directory
 
+    # Download the 7-Zip package
     - name: Download the 7-Zip package
       win_get_url:
         url: https://www.7-zip.org/a/7z2301-x64.msi
         dest: C:\temp\7z.msi
 
-    - name: Ensure 7-Zip is installed through win_package
+    # Ensure 7-Zip is installed through win_package
+    - name: Ensure 7-Zip is installed
       win_package:
         path: C:\temp\7z.msi
         state: present
+
+    # Remove the downloaded 7-Zip package
+    - name: Remove the downloaded 7-Zip package
+      win_file:
+        path: C:\temp\7z.msi
+        state: absent
