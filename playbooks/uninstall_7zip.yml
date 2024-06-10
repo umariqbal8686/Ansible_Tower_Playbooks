@@ -16,12 +16,7 @@
       register: check_7zip_reg
       ignore_errors: true
 
-    # Uninstall 7-Zip if found (executable)
-    - name: Uninstall 7-Zip if found (executable)
-      win_command: 'uninstall.exe /S'  # Replace with actual uninstall command for exe
-      when: check_7zip_exe.stdout != ""
-
-    # Uninstall 7-Zip if found (MSI)
+    # Uninstall 7-Zip if found
     - name: Uninstall existing version of 7-Zip
       win_package:
         name: 7-Zip 19.00 (x64 edition)
