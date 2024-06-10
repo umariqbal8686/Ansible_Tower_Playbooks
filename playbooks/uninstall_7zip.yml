@@ -6,16 +6,16 @@
   tasks:
     # Get list of installed software
     - name: Get list of installed software
-      win_package_facts:
-        fact_path: '{{ playbook_dir }}/installed_software'
+      win_package:
         gather_subset: all
+      register: installed_software
 
     # Find display name containing "7-Zip"
     - name: Find display name of 7-Zip
       set_fact:
-        display_name: "{{ item }}.DisplayName"
-      loop: "{{ ansible_facts.win_package_facts.installed }}"
-      when: "'7-Zip' in item"
+        display_name: "{{ item.DisplayName }}"
+      loop: "{{ installed_software.results }}"
+      when: "'7-Zip' in item.DisplayName"
 
     # Uninstall 7-Zip if it exists
     - name: Uninstall 7-Zip if it exists
