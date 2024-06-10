@@ -18,13 +18,7 @@
 
     - name: Remove duplicate entries from installed software list
       set_fact:
-        installed_software: >-
-          {{
-            installed_software_raw |
-            items2dict(key_name='DisplayName', value_name='item') |
-            dict2items(key_name='DisplayName', value_name='item') |
-            map(attribute='item')
-          }}
+        installed_software: "{{ installed_software_raw | unique(attribute='DisplayName') }}"
 
     - name: Show list of installed software
       debug:
