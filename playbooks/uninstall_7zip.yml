@@ -22,6 +22,7 @@
       when: check_7zip_exe.stdout != ""
 
     # Uninstall 7-Zip if found (MSI)
-    - name: Uninstall 7-Zip if found (MSI)
-      win_shell: 'wmic product where "name like \'%%7-Zip%%\'" call uninstall /nointeractive'
-      when: check_7zip_reg.rc == 0
+    - name: Uninstall existing version of 7-Zip
+      win_package:
+        name: 7-Zip 19.00 (x64 edition)
+        state: absent
