@@ -19,9 +19,9 @@
     # Uninstall 7-Zip (exe) if it exists
     - name: Uninstall 7-Zip (exe) if it exists
       win_shell: 'uninstall.exe /S'  # Replace with actual uninstall command for exe
-      when: check_7zip_exe.rc == 0
+      when: check_7zip_exe.stdout != ""
 
     # Uninstall 7-Zip (MSI) if it exists
     - name: Uninstall 7-Zip (MSI) if it exists
       win_shell: 'wmic product where "name like \'%%7-Zip%%\'" call uninstall /nointeractive'
-      when: check_7zip_msi.stdout is search("7-Zip")
+      when: check_7zip_msi.stdout != ""
