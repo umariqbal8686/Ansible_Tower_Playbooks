@@ -7,7 +7,7 @@
       win_shell: |
         $software = Get-ChildItem -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall" |
                     Get-ItemProperty |
-                    Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, UninstallString
+                    Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, UninstallString, PSChildName
         $software | Where-Object { $_.DisplayName -ne $null } | ConvertTo-Json
       register: installed_software_json
 
@@ -25,7 +25,8 @@
 
     - name: Uninstall 7-Zip if it exists
       win_package:
-        path: "{{ seven_zip.UninstallString }}"
+        path: "{{ seven_zip.UninstallString if seven_zip.UninstallString.endswith('.msi') else '' }}"
+        product_id: "{{ seven_zip.PSChildName if not seven_zip.UninstallString.endswith('.msi') else '' }}"
         state: absent
       when: seven_zip is defined
       register: uninstall_7zip
