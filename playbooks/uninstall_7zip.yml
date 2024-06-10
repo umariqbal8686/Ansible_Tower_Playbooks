@@ -1,57 +1,24 @@
 ---
-- name: Uninstall 7-Zip if installed
-  hosts: all
-  gather_facts: no
+- name: Uninstall 7zip
+  hosts: windows_server
+  become: yes
+
   tasks:
-    - name: Get list of installed software from registry
-      win_shell: |
-        $software = Get-ChildItem -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall" |
-                    Get-ItemProperty |
-                    Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, UninstallString, PSChildName
-        $software | Where-Object { $_.DisplayName -ne $null } | ConvertTo-Json
-      register: installed_software_json
+  - name: Find 7zip installation
+    win_registry:
+      name: HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall
+      recurse: yes
+      values:
+        - {name: DisplayName, value: '7-Zip*'}
+        - {name: InstallLocation, value: 'C:\Program Files\7-Zip'}
+    register: uninstall_info
 
-    - name: Parse installed software JSON
-      set_fact:
-        installed_software_raw: "{{ installed_software_json.stdout | from_json }}"
+  - name: Uninstall 7zip (exe)
+    win_shell: 'C:\Program Files\7-Zip\Uninstall.exe /S'
+    when: uninstall_info.values | selectattr("name", "equalto", "DisplayName") | list | length > 0
 
-    - name: Remove duplicate entries from installed software list
-      set_fact:
-        installed_software: "{{ installed_software_raw | unique(attribute='DisplayName') }}"
-
-    - name: Find 7-Zip in the installed software list
-      set_fact:
-        seven_zip: "{{ installed_software | selectattr('DisplayName', 'match', '^7-Zip') | list | first }}"
-      when: installed_software | length > 0
-
-    - name: Uninstall 7-Zip if it exists (MSI)
-      win_package:
-        path: "{{ seven_zip.UninstallString }}"
-        state: absent
-      when: seven_zip is defined and seven_zip.UninstallString is search('.msi', seven_zip.UninstallString)
-      register: uninstall_7zip_msi
-      ignore_errors: yes
-
-    - name: Reboot if uninstall required it (MSI)
-      win_reboot:
-      when: uninstall_7zip_msi is defined and uninstall_7zip_msi.rc == 0 and uninstall_7zip_msi.reboot_required
-
-    - name: Uninstall 7-Zip if it exists (non-MSI)
-      win_package:
-        product_id: "{{ seven_zip.PSChildName }}"
-        state: absent
-      when: seven_zip is defined and not seven_zip.UninstallString is search('.msi', seven_zip.UninstallString)
-      register: uninstall_7zip_non_msi
-      ignore_errors: yes
-
-    - name: Reboot if uninstall required it (non-MSI)
-      win_reboot:
-      when: uninstall_7zip_non_msi is defined and uninstall_7zip_non_msi.rc == 0 and uninstall_7zip_non_msi.reboot_required
-
-    - name: Debug output for installed software
-      debug:
-        var: installed_software
-
-    - name: Debug output for found 7-Zip
-      debug:
-        var: seven_zip
+  - name: Uninstall 7zip (msi)
+    win_msi:
+      name: '7-Zip'
+      state: absent
+    when: uninstall_info.values | selectattr("name", "equalto", "InstallLocation") | list | length > 0
