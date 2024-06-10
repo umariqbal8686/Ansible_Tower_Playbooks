@@ -12,7 +12,7 @@
 
     # Check if 7-Zip (MSI) is installed
     - name: Check if 7-Zip (MSI) is installed
-      win_shell: 'wmic product where "name like \'%%7-Zip%%'\" get Name'
+      win_shell: 'wmic product where "name like '\%%7-Zip%%\'" get Name'
       register: check_7zip_msi
       ignore_errors: true
 
@@ -23,5 +23,5 @@
 
     # Uninstall 7-Zip (MSI) if it exists
     - name: Uninstall 7-Zip (MSI) if it exists
-      win_shell: 'wmic product where "name like \'%%7-Zip%%'\" call uninstall /nointeractive'
+      win_shell: 'wmic product where "name like '\%%7-Zip%%\'" call uninstall /nointeractive'
       when: check_7zip_msi.stdout != ""
