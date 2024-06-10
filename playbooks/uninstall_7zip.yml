@@ -16,7 +16,12 @@
       register: check_7zip_reg
       ignore_errors: true
 
-    # Uninstall 7-Zip if found
-    - name: Uninstall 7-Zip if found
+    # Uninstall 7-Zip if found (executable)
+    - name: Uninstall 7-Zip if found (executable)
       win_command: 'uninstall.exe /S'  # Replace with actual uninstall command for exe
-      when: check_7zip_exe.stdout != "" or check_7zip_reg.rc == 0
+      when: check_7zip_exe.stdout != ""
+
+    # Uninstall 7-Zip if found (MSI)
+    - name: Uninstall 7-Zip if found (MSI)
+      win_shell: 'wmic product where "name like \'%%7-Zip%%\'" call uninstall /nointeractive'
+      when: check_7zip_reg.rc == 0
