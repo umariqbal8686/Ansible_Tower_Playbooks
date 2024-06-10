@@ -6,11 +6,19 @@
   tasks:
     - name: Get list of installed software from registry
       win_shell: |
-        Get-ChildItem -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall" | 
-        Get-ItemProperty | 
-        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
+        $software = Get-ChildItem -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall" |
+                    Get-ItemProperty |
+                    Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
+        $software | ForEach-Object {
+          [PSCustomObject]@{
+            DisplayName     = $_.DisplayName
+            DisplayVersion  = $_.DisplayVersion
+            Publisher       = $_.Publisher
+            InstallDate     = $_.InstallDate
+          }
+        } | Format-Table -AutoSize | Out-String
       register: installed_software
 
     - name: Show list of installed software
       debug:
-        var: installed_software.stdout_lines
+        msg: "{{ installed_software.stdout }}"
