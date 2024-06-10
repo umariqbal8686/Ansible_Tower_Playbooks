@@ -1,14 +1,15 @@
 ---
-- name: List Installed Windows Updates
+- name: Get Installed Updates
   hosts: windows_hosts
   gather_facts: no
 
   tasks:
-    - name: Get installed updates
-      win_updates:
-        state: installed
-      register: updates_info
+    - name: Run PowerShell command to get installed updates
+      win_shell: |
+        $updates = Get-WmiObject -Class Win32_QuickFixEngineering | Select-Object -Property Description, HotFixID, InstalledOn
+        $updates | ConvertTo-Json
+      register: installed_updates
 
     - name: Print installed updates
       debug:
-        var: updates_info
+        var: installed_updates.stdout_lines
