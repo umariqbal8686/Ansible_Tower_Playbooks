@@ -1,14 +1,9 @@
----
-- name: Uninstall 7zip
+- name: Uninstall 7-Zip
   hosts: all
   become: yes
 
   tasks:
-    - name: Find 7zip installation
-      ansible.windows.win_registry:
-        name: HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall
-        recurse: yes
-        values:
-          - {name: DisplayName, value: '7-Zip*'}
-          - {name: InstallLocation, value: 'C:\Program Files\7-Zip'}
-      register: uninstall_info
+    - name: Uninstall 7-Zip
+      ansible.windows.win_package:
+        name: '7-Zip 23.01 (x64 edition)'
+        state: absent
