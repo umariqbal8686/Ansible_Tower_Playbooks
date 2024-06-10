@@ -1,0 +1,15 @@
+---
+# Install 7-zip with win_package
+- name: Downlaod and install 7zip
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Download the 7-Zip package
+      win_get_url:
+        url: https://www.7-zip.org/a/7z2301-x64.msi
+        dest: C:\temp\7z.msi
+
+    - name: ensure 7-Zip is installed through win_package
+      win_package:
+        path: C:\temp\7z.msi
+        state: present

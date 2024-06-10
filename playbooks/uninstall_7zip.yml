@@ -1,0 +1,10 @@
+---
+# uninstall with win_package
+- name: Downlaod and install 7zip
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: ensure 7-Zip is uninstalled through win_package
+      win_package:
+        path: C:\temp\7z.msi
+        state: absent
