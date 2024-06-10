@@ -4,22 +4,21 @@
   hosts: all
   gather_facts: no
   tasks:
-    # Get list of installed software
-    - name: Get list of installed software
-      win_package:
-        gather_subset: all
-      register: installed_software
+    # Query the registry for 7-Zip uninstall information
+    - name: Query registry for 7-Zip uninstall information
+      ansible.windows.win_reg_stat:
+        path: "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+      register: reg_query_result
 
-    # Find display name containing "7-Zip"
-    - name: Find display name of 7-Zip
+    # Extract uninstall string for 7-Zip
+    - name: Extract uninstall string for 7-Zip
       set_fact:
-        display_name: "{{ item.DisplayName }}"
-      loop: "{{ installed_software.results }}"
-      when: "'7-Zip' in item.DisplayName"
+        uninstall_string: "{{ item.value['UninstallString'] }}"
+      loop: "{{ reg_query_result.subkeys | default([]) }}"
+      when: "'7-Zip' in item.value['DisplayName']"
 
-    # Uninstall 7-Zip if it exists
-    - name: Uninstall 7-Zip if it exists
-      win_package:
-        name: "{{ display_name }}"
-        state: absent
-      when: display_name is defined
+    # Uninstall 7-Zip if uninstall string is found
+    - name: Uninstall 7-Zip if uninstall string is found
+      ansible.windows.win_command:
+        cmd: "{{ uninstall_string }} /quiet /norestart"
+      when: uninstall_string is defined
