@@ -14,7 +14,17 @@
 
     - name: Parse installed software JSON
       set_fact:
-        installed_software: "{{ installed_software_json.stdout | from_json }}"
+        installed_software_raw: "{{ installed_software_json.stdout | from_json }}"
+
+    - name: Remove duplicate entries from installed software list
+      set_fact:
+        installed_software: >-
+          {{
+            installed_software_raw |
+            items2dict(key_name='DisplayName', value_name='item') |
+            dict2items(key_name='DisplayName', value_name='item') |
+            map(attribute='item')
+          }}
 
     - name: Show list of installed software
       debug:
