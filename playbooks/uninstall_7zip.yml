@@ -1,6 +1,6 @@
 ---
 - name: Uninstall 7zip
-  hosts: windows_server
+  hosts: all
   become: yes
 
   tasks:
