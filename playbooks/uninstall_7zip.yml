@@ -1,6 +1,6 @@
 ---
-# Locate and uninstall 7-Zip if it exists
-- name: Locate and uninstall 7-Zip if it exists
+# Uninstall 7-Zip if it exists
+- name: Uninstall 7-Zip if it exists
   hosts: all
   gather_facts: no
   tasks:
@@ -10,15 +10,8 @@
         fact_path: '{{ playbook_dir }}/installed_software'
         gather_facts: yes
 
-    # Show list of installed software (for debugging purposes)
-    - name: Show list of installed software
-      debug:
-        var: ansible_facts.installed_software
-
     # Uninstall 7-Zip if it exists
     - name: Uninstall 7-Zip if it exists
       win_package:
-        name: "{{ item }}"
+        name: 7-Zip  # Replace with the actual display name of 7-Zip in the "Programs and Features" list
         state: absent
-      loop: "{{ ansible_facts.installed_software }}"
-      when: "'7-Zip' in item"
