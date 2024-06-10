@@ -1,0 +1,14 @@
+---
+# List installed software to find the display name of 7-Zip
+- name: List installed software
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Get list of installed software
+      win_package:
+        fact_path: '{{ playbook_dir }}/installed_software'
+        gather_facts: yes
+
+    - name: Show list of installed software
+      debug:
+        var: ansible_facts.installed_software
