@@ -1,13 +1,43 @@
 ---
-# Automatically uninstall 7-Zip if it exists
-- name: Automatically uninstall 7-Zip if it exists
+- name: Uninstall 7-Zip if installed
   hosts: all
   gather_facts: no
   tasks:
-    # Uninstall 7-Zip if it exists
+    - name: Get list of installed software from registry
+      win_shell: |
+        $software = Get-ChildItem -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall" |
+                    Get-ItemProperty |
+                    Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, UninstallString
+        $software | Where-Object { $_.DisplayName -ne $null } | ConvertTo-Json
+      register: installed_software_json
+
+    - name: Parse installed software JSON
+      set_fact:
+        installed_software_raw: "{{ installed_software_json.stdout | from_json }}"
+
+    - name: Remove duplicate entries from installed software list
+      set_fact:
+        installed_software: "{{ installed_software_raw | unique(attribute='DisplayName') }}"
+
+    - name: Find 7-Zip in the installed software list
+      set_fact:
+        seven_zip: "{{ installed_software | selectattr('DisplayName', 'match', '^7-Zip') | list | first }}"
+
     - name: Uninstall 7-Zip if it exists
-      ansible.windows.win_command: |
-        if (Test-Path "C:\\Program Files\\7-Zip\\Uninstall.exe") {
-            Start-Process "C:\\Program Files\\7-Zip\\Uninstall.exe" -ArgumentList "/S" -Wait
-        }
-      ignore_errors: yes
+      win_package:
+        path: "{{ seven_zip.UninstallString }}"
+        state: absent
+      when: seven_zip is defined
+      register: uninstall_7zip
+
+    - name: Reboot if uninstall required it
+      win_reboot:
+        when: uninstall_7zip.reboot_required
+
+    - name: Debug output for installed software
+      debug:
+        var: installed_software
+
+    - name: Debug output for found 7-Zip
+      debug:
+        var: seven_zip
