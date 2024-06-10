@@ -22,7 +22,3 @@
     - name: Parse installed software JSON
       set_fact:
         installed_software: "{{ installed_software_json.stdout | from_json }}"
-
-    - name: Show list of installed software
-      debug:
-        var: installed_software
