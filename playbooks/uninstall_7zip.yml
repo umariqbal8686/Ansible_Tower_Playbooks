@@ -5,20 +5,10 @@
 
   tasks:
   - name: Find 7zip installation
-    win_registry:
+    ansible.windows.win_registry:
       name: HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall
       recurse: yes
       values:
         - {name: DisplayName, value: '7-Zip*'}
         - {name: InstallLocation, value: 'C:\Program Files\7-Zip'}
     register: uninstall_info
-
-  - name: Uninstall 7zip (exe)
-    win_shell: 'C:\Program Files\7-Zip\Uninstall.exe /S'
-    when: uninstall_info.values | selectattr("name", "equalto", "DisplayName") | list | length > 0
-
-  - name: Uninstall 7zip (msi)
-    win_msi:
-      name: '7-Zip'
-      state: absent
-    when: uninstall_info.values | selectattr("name", "equalto", "InstallLocation") | list | length > 0
