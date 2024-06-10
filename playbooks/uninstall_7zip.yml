@@ -22,6 +22,7 @@
     - name: Find 7-Zip in the installed software list
       set_fact:
         seven_zip: "{{ installed_software | selectattr('DisplayName', 'match', '^7-Zip') | list | first }}"
+      when: installed_software | length > 0
 
     - name: Uninstall 7-Zip if it exists (MSI)
       win_package:
