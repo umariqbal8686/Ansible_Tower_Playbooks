@@ -23,17 +23,27 @@
       set_fact:
         seven_zip: "{{ installed_software | selectattr('DisplayName', 'match', '^7-Zip') | list | first }}"
 
-    - name: Uninstall 7-Zip if it exists
+    - name: Uninstall 7-Zip if it exists (MSI)
       win_package:
-        path: "{{ seven_zip.UninstallString if seven_zip.UninstallString.endswith('.msi') else '' }}"
-        product_id: "{{ seven_zip.PSChildName if not seven_zip.UninstallString.endswith('.msi') else '' }}"
+        path: "{{ seven_zip.UninstallString }}"
         state: absent
-      when: seven_zip is defined
-      register: uninstall_7zip
+      when: seven_zip is defined and seven_zip.UninstallString is search('.msi', seven_zip.UninstallString)
+      register: uninstall_7zip_msi
 
-    - name: Reboot if uninstall required it
+    - name: Uninstall 7-Zip if it exists (non-MSI)
+      win_package:
+        product_id: "{{ seven_zip.PSChildName }}"
+        state: absent
+      when: seven_zip is defined and not seven_zip.UninstallString is search('.msi', seven_zip.UninstallString)
+      register: uninstall_7zip_non_msi
+
+    - name: Reboot if uninstall required it (MSI)
       win_reboot:
-        when: uninstall_7zip.reboot_required
+      when: uninstall_7zip_msi.reboot_required
+
+    - name: Reboot if uninstall required it (non-MSI)
+      win_reboot:
+      when: uninstall_7zip_non_msi.reboot_required
 
     - name: Debug output for installed software
       debug:
