@@ -1,0 +1,14 @@
+---
+- name: List Installed Windows Updates
+  hosts: windows_hosts
+  gather_facts: no
+
+  tasks:
+    - name: Get installed updates
+      win_updates:
+        state: installed
+      register: updates_info
+
+    - name: Print installed updates
+      debug:
+        var: updates_info
