@@ -16,9 +16,13 @@
             Publisher       = $_.Publisher
             InstallDate     = $_.InstallDate
           }
-        } | Format-Table -AutoSize | Out-String
-      register: installed_software
+        } | ConvertTo-Json
+      register: installed_software_json
+
+    - name: Parse installed software JSON
+      set_fact:
+        installed_software: "{{ installed_software_json.stdout | from_json }}"
 
     - name: Show list of installed software
       debug:
-        msg: "{{ installed_software.stdout }}"
+        var: installed_software
