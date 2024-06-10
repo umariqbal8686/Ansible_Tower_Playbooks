@@ -1,17 +1,13 @@
 ---
-# Automatically locate and uninstall 7-Zip if it exists
-- name: Automatically locate and uninstall 7-Zip if it exists
+# Automatically uninstall 7-Zip if it exists
+- name: Automatically uninstall 7-Zip if it exists
   hosts: all
   gather_facts: no
   tasks:
-    # Query the registry for 7-Zip uninstall information
-    - name: Query registry for 7-Zip uninstall information
-      win_command: |
-        powershell.exe -Command "(Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*').UninstallString | Where-Object {$_ -like '*7-Zip*'}"
-      register: uninstall_string_result
-
-    # Uninstall 7-Zip if uninstall string is found
-    - name: Uninstall 7-Zip if uninstall string is found
-      win_command: "{{ item }}"
-      loop: "{{ uninstall_string_result.stdout_lines }}"
-      when: uninstall_string_result.stdout_lines | length > 0
+    # Uninstall 7-Zip if it exists
+    - name: Uninstall 7-Zip if it exists
+      ansible.windows.win_command: |
+        if (Test-Path "C:\\Program Files\\7-Zip\\Uninstall.exe") {
+            Start-Process "C:\\Program Files\\7-Zip\\Uninstall.exe" -ArgumentList "/S" -Wait
+        }
+      ignore_errors: yes
