@@ -29,6 +29,11 @@
         state: absent
       when: seven_zip is defined and seven_zip.UninstallString is search('.msi', seven_zip.UninstallString)
       register: uninstall_7zip_msi
+      ignore_errors: yes
+
+    - name: Reboot if uninstall required it (MSI)
+      win_reboot:
+      when: uninstall_7zip_msi is defined and uninstall_7zip_msi.rc == 0 and uninstall_7zip_msi.reboot_required
 
     - name: Uninstall 7-Zip if it exists (non-MSI)
       win_package:
@@ -36,14 +41,11 @@
         state: absent
       when: seven_zip is defined and not seven_zip.UninstallString is search('.msi', seven_zip.UninstallString)
       register: uninstall_7zip_non_msi
-
-    - name: Reboot if uninstall required it (MSI)
-      win_reboot:
-      when: uninstall_7zip_msi.reboot_required
+      ignore_errors: yes
 
     - name: Reboot if uninstall required it (non-MSI)
       win_reboot:
-      when: uninstall_7zip_non_msi.reboot_required
+      when: uninstall_7zip_non_msi is defined and uninstall_7zip_non_msi.rc == 0 and uninstall_7zip_non_msi.reboot_required
 
     - name: Debug output for installed software
       debug:
