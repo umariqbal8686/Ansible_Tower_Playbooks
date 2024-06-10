@@ -23,5 +23,5 @@
 
     # Uninstall 7-Zip (MSI) if it exists
     - name: Uninstall 7-Zip (MSI) if it exists
-      win_shell: 'wmic product where "name like \'%%7-Zip%%\'" call uninstall /nointeractive'
+      win_shell: 'reg delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /f /v "7-Zip"'
       when: check_7zip_msi.rc == 0
