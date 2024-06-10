@@ -1,10 +1,16 @@
 ---
-# uninstall with win_package
-- name: Downlaod and install 7zip
+# Verify installed 7-Zip and uninstall if exists
+- name: Verify installed 7-Zip and uninstall if exists
   hosts: all
   gather_facts: no
   tasks:
-    - name: ensure 7-Zip is uninstalled through win_package
-      win_package:
-        path: C:\temp\7z.msi
-        state: absent
+    # Check if 7-Zip is installed
+    - name: Check if 7-Zip is installed
+      win_command: '7z --help'
+      register: check_7zip
+      ignore_errors: true
+
+    # Uninstall 7-Zip if it exists
+    - name: Uninstall 7-Zip if it exists
+      win_shell: 'wmic product where "name like ''7-Zip%%''" call uninstall /nointeractive'
+      when: check_7zip.rc == 0
