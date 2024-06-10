@@ -1,27 +1,22 @@
 ---
-# Verify installed 7-Zip (exe or MSI) and uninstall if exists
-- name: Verify installed 7-Zip (exe or MSI) and uninstall if exists
+# Verify installed 7-Zip and uninstall if exists
+- name: Verify installed 7-Zip and uninstall if exists
   hosts: all
   gather_facts: no
   tasks:
-    # Check if 7-Zip (exe) is installed
-    - name: Check if 7-Zip (exe) is installed
-      win_command: 'where 7z.exe'
+    # Check if 7-Zip executable exists
+    - name: Check if 7-Zip executable exists
+      win_command: 'where /R C:\ 7z.exe'
       register: check_7zip_exe
       ignore_errors: true
 
-    # Check if 7-Zip (MSI) is installed
-    - name: Check if 7-Zip (MSI) is installed
+    # Check if 7-Zip is listed in registry
+    - name: Check if 7-Zip is listed in registry
       win_shell: 'reg query "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /s /f "7-Zip"'
-      register: check_7zip_msi
+      register: check_7zip_reg
       ignore_errors: true
 
-    # Uninstall 7-Zip (exe) if it exists
-    - name: Uninstall 7-Zip (exe) if it exists
-      win_shell: 'uninstall.exe /S'  # Replace with actual uninstall command for exe
-      when: check_7zip_exe.stdout != ""
-
-    # Uninstall 7-Zip (MSI) if it exists
-    - name: Uninstall 7-Zip (MSI) if it exists
-      win_shell: 'reg delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /f /v "7-Zip"'
-      when: check_7zip_msi.rc == 0
+    # Uninstall 7-Zip if found
+    - name: Uninstall 7-Zip if found
+      win_command: 'uninstall.exe /S'  # Replace with actual uninstall command for exe
+      when: check_7zip_exe.stdout != "" or check_7zip_reg.rc == 0
