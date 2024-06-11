@@ -1,0 +1,32 @@
+---
+- name: Ensure fPromptForPassword is set to 0 and reboot if necessary
+  hosts: all
+  become: yes
+  tasks:
+    - name: Set fPromptForPassword registry key and update group policy
+      win_shell: |
+        $path='HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services';
+        $propertyName='fPromptForPassword';
+        $newValue=0;
+        $currentValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
+        if ($currentValue -ne $newValue) {
+          New-ItemProperty -Path $path -Name $propertyName -Value $newValue -PropertyType DWord -Force;
+          gpupdate /force;
+          $updatedValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
+          if ($updatedValue -eq $newValue) {
+            Restart-Computer -Force
+          } else {
+            Write-Output "Registry value is not set correctly after group policy update."
+          }
+        } else {
+          Write-Output "No change required. The registry value is already set to the desired state."
+        }
+
+    - name: Wait for the server to come back online after reboot
+      wait_for_connection:
+        timeout: 600
+      when: ansible_facts['reboot_required'] is defined and ansible_facts['reboot_required']
+
+    - name: Ensure the system is reachable post reboot
+      win_ping:
+      when: ansible_facts['reboot_required'] is defined and ansible_facts['reboot_required']
