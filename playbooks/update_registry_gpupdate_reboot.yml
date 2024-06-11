@@ -32,15 +32,3 @@
     - name: Ensure the system is reachable post reboot
       win_ping:
       when: reboot_required | default(false)
-
-    - name: Verify registry key after reboot
-      win_shell: |
-        $path='HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services';
-        $propertyName='fPromptForPassword';
-        $expectedValue=0;
-        $currentValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
-        if ($currentValue -eq $expectedValue) {
-          Write-Output "Registry key validation successful after reboot. The value is $currentValue."
-        } else {
-          Write-Output "Registry key validation failed after reboot. The value is $currentValue."
-        }
