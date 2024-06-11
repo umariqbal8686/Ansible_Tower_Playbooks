@@ -13,22 +13,25 @@
           gpupdate /force;
           $updatedValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
           if ($updatedValue -eq $newValue) {
+            $reboot_required = $true
             Restart-Computer -Force
           } else {
             Write-Output "Registry value is not set correctly after group policy update."
+            $reboot_required = $false
           }
         } else {
           Write-Output "No change required. The registry value is already set to the desired state."
+          $reboot_required = $false
         }
 
     - name: Wait for the server to come back online after reboot
       wait_for_connection:
         timeout: 600
-      when: reboot_required
+      when: reboot_required | default(false)
 
     - name: Ensure the system is reachable post reboot
       win_ping:
-      when: reboot_required
+      when: reboot_required | default(false)
 
     - name: Verify registry key after reboot
       win_shell: |
