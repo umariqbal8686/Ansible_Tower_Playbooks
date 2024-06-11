@@ -1,0 +1,19 @@
+---
+- name: Verify if fPromptForPassword registry key exists
+  hosts: all
+  tasks:
+    - name: Check if fPromptForPassword registry key exists
+      win_reg_stat:
+        path: 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services'
+        name: 'fPromptForPassword'
+      register: registry_key_info
+
+    - name: Display message if registry key exists
+      debug:
+        msg: "fPromptForPassword registry key exists: {{ registry_key_info.exists }}"
+      when: registry_key_info.exists
+
+    - name: Display message if registry key does not exist
+      debug:
+        msg: "fPromptForPassword registry key does not exist"
+      when: not registry_key_info.exists
