@@ -1,0 +1,34 @@
+---
+- name: Ensure fPromptForPassword is set to 0 and update group policy
+  hosts: all
+  tasks:
+    - name: Set fPromptForPassword registry key and update group policy
+      win_shell: |
+        $path='HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services';
+        $propertyName='fPromptForPassword';
+        $newValue=0;
+        $currentValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
+        if ($currentValue -ne $newValue) {
+          New-ItemProperty -Path $path -Name $propertyName -Value $newValue -PropertyType DWord -Force;
+          gpupdate /force;
+          $updatedValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
+          if ($updatedValue -eq $newValue) {
+            Write-Output "Registry value set and group policy updated successfully."
+          } else {
+            Write-Output "Registry value is not set correctly after group policy update."
+          }
+        } else {
+          Write-Output "No change required. The registry value is already set to the desired state."
+        }
+
+    - name: Verify registry key status after gpupdate
+      win_shell: |
+        $path='HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services';
+        $propertyName='fPromptForPassword';
+        $expectedValue=0;
+        $currentValue=(Get-ItemProperty -Path $path -Name $propertyName -ErrorAction SilentlyContinue).$propertyName;
+        if ($currentValue -eq $expectedValue) {
+          Write-Output "Registry key verification successful. The value is $currentValue."
+        } else {
+          Write-Output "Registry key verification failed. The value is $currentValue."
+        }
