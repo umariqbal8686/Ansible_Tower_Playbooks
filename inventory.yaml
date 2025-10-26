@@ -1,0 +1,13 @@
+---
+all:
+  hosts:
+    SRV-2022.bell.ca:
+      ansible_host: 10.20.30.201
+      # ansible_user: umar
+      # ansible_password: P@ssw0rd
+      # ansible_become_pass: P@ssw0rd
+   # SRV-2022.bell.ca:
+   #   ansible_host: 10.20.30.201
+      # ansible_user: umar
+      # ansible_password: P@ssw0rd
+      # ansible_become_pass: P@ssw0rd
