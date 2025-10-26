@@ -1,5 +1,9 @@
-- name: Uninstall 7-Zip
+---
+- name: Manage 7-Zip on Windows hosts
   hosts: all
+  gather_facts: false
+  
+  # Enable privilege escalation for the entire play
   become: true
   become_method: runas
   
