@@ -1,0 +1,20 @@
+---
+# Test connectivity to Ubuntu hosts using ping module
+- name: Test ping to Ubuntu hosts
+  hosts: all  # Targets the ubuntu group in inventory
+  gather_facts: false  # Disable fact gathering for faster execution
+  
+  tasks:
+    - name: Ping Ubuntu hosts
+      ping:  # Uses Ansible's built-in ping module
+      register: ping_result
+
+    - name: Display ping results
+      debug:
+        var: ping_result
+        verbosity: 0  # Always show output
+
+    - name: Show host information
+      debug:
+        msg: "Successfully connected to {{ inventory_hostname }}"
+      when: ping_result is success
