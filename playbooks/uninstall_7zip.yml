@@ -8,19 +8,64 @@
   become_user: "Administrator"  # Specify the user to run as
   
   tasks:
-    - name: Get 7-Zip product code from registry
+    - name: Get 7-Zip installation details
       win_shell: |
-        $products = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "7-Zip*" }
-        if ($products) {
-            Write-Output $products[0].IdentifyingNumber
+        $ErrorActionPreference = 'SilentlyContinue'
+        
+        # Method 1: Direct registry check (faster)
+        $paths = @(
+            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+        )
+        
+        foreach ($path in $paths) {
+            $app = Get-ItemProperty $path | Where-Object { 
+                $_.DisplayName -like '7-Zip*' -and $_.UninstallString -like '*msiexec*'
+            } | Select-Object -First 1
+            
+            if ($app) {
+                if ($app.UninstallString -match '{[A-F0-9-]+}') {
+                    $productCode = $matches[0]
+                    Write-Output "Found via Registry: $productCode"
+                    exit 0
+                }
+            }
         }
-      register: product_code
+        
+        # Method 2: WMI check (fallback)
+        $product = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like '7-Zip*' } | Select-Object -First 1
+        if ($product) {
+            Write-Output "Found via WMI: $($product.IdentifyingNumber)"
+            exit 0
+        }
+        
+        Write-Output "NO_PRODUCT_FOUND"
+      register: find_7zip
       changed_when: false
+
+    - name: Debug - Show found product code
+      debug:
+        var: find_7zip.stdout_lines
       
-    - name: Uninstall 7-Zip using MSI product code
-      win_command: msiexec.exe /x "{{ product_code.stdout_lines[0] }}" /qn /norestart
-      when: product_code.stdout_lines | length > 0
+    - name: Uninstall 7-Zip using product code
+      win_command: >-
+        msiexec.exe /x "{{ find_7zip.stdout_lines[0] | regex_replace('^Found via (Registry|WMI): (.+)$', '\\2') }}"
+        /qn /norestart /l*v "C:\Windows\Temp\7zip_uninstall.log"
+      when: find_7zip.stdout_lines[0] != "NO_PRODUCT_FOUND"
       register: uninstall_result
       async: 300
       poll: 5
-      ignore_errors: true  # Continue even if the product is already uninstalled
+      ignore_errors: true
+      
+    - name: Show uninstall log if available
+      win_shell: |
+        if (Test-Path "C:\Windows\Temp\7zip_uninstall.log") {
+          Get-Content "C:\Windows\Temp\7zip_uninstall.log" | Select-Object -Last 20
+        }
+      when: uninstall_result.changed
+      register: log_output
+      
+    - name: Debug - Show uninstall log
+      debug:
+        var: log_output.stdout_lines
+      when: log_output is defined
