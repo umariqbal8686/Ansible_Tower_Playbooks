@@ -3,9 +3,9 @@
   hosts: all
   gather_facts: false
   
-  # Enable privilege escalation for the entire play
   become: true
   become_method: runas
+  become_user: "Administrator"  # Specify the user to run as
   
   tasks:
     - name: Uninstall 7-Zip
