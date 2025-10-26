@@ -1,8 +1,8 @@
 ---
 # Playbook to update and upgrade Ubuntu systems
 - name: Update and upgrade Ubuntu systems
-  hosts: all  # Will use the hosts from ubuntu-inventory.yaml
-  become: true  # Use sudo for package operations
+  hosts: all  # Will use the hosts from inventory
+  become: yes  # Will use credentials from AWX
   gather_facts: true  # Need facts for OS verification
   
   tasks:
