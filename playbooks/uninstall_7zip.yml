@@ -1,7 +1,8 @@
 - name: Uninstall 7-Zip
   hosts: all
-  become: yes
-
+  become: true
+  become_method: runas
+  
   tasks:
     - name: Uninstall 7-Zip
       ansible.windows.win_package:
