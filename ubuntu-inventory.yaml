@@ -1,0 +1,5 @@
+---
+all:
+  hosts:
+    ubuntu-cli-02:
+      ansible_host: 10.20.30.203
