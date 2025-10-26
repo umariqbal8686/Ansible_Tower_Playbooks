@@ -25,17 +25,49 @@
       register: uninstall_string_search
       changed_when: false
 
-    - name: Uninstall 7-Zip using the found uninstall string
+    - name: Uninstall 7-Zip using the found uninstall string (silent mode)
       win_shell: |
         $enc = '{{ uninstall_string_search.stdout | b64encode }}'
         if ($enc -ne '') {
           $u = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enc))
-          Write-Output "Running uninstall: $u"
-          Invoke-Expression $u
+          
+          # Convert the uninstall string to silent mode
+          if ($u -match 'msiexec(.exe)?') {
+            # For MSI installers, convert /I to /X and add silent flags
+            $u = $u -replace '/I', '/X'
+            if (-not ($u -match '/qn')) {
+              $u = "$u /qn /norestart"
+            }
+          } else {
+            # For exe installers (like 7z), try common silent flags
+            if (-not ($u -match '/S|/SILENT|/VERYSILENT')) {
+              $u = "$u /S"  # 7-Zip uses /S for silent
+            }
+          }
+          
+          Write-Output "Running silent uninstall: $u"
+          
+          # Run the uninstaller with a timeout
+          $job = Start-Job -ScriptBlock { 
+            param($cmd)
+            Invoke-Expression $cmd
+          } -ArgumentList $u
+          
+          # Wait up to 2 minutes
+          if (Wait-Job $job -Timeout 120) {
+            Receive-Job $job
+            Remove-Job $job
+            Write-Output "Uninstall completed"
+          } else {
+            Remove-Job $job -Force
+            throw "Uninstall timed out after 120 seconds"
+          }
         } else {
           Write-Output 'No uninstall string found; nothing to do.'
         }
       when: uninstall_string_search.stdout is defined and (uninstall_string_search.stdout | length) > 0
       register: uninstall_result
-      failed_when: false
-      changed_when: "'Running uninstall:' in (uninstall_result.stdout | default(''))"
+      failed_when: "'timed out' in (uninstall_result.stderr | default(''))"
+      changed_when: "'Running silent uninstall:' in (uninstall_result.stdout | default(''))"
+      async: 150  # Allow 2.5 minutes total
+      poll: 10    # Check every 10 seconds
