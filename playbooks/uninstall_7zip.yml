@@ -8,66 +8,19 @@
   become_user: "Administrator"  # Specify the user to run as
   
   tasks:
-    - name: Locate 7-Zip uninstall string in registry
+    - name: Get 7-Zip product code from registry
       win_shell: |
-        $display = '7-Zip*'
-        $keys = @(
-          'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-          'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
-          'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
-        )
-        $found = $null
-        foreach ($k in $keys) {
-          $items = Get-ItemProperty -Path $k -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like $display }
-          if ($items) { $found = $items[0].UninstallString; break }
+        $products = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "7-Zip*" }
+        if ($products) {
+            Write-Output $products[0].IdentifyingNumber
         }
-        if ($found) { Write-Output $found } else { Write-Output '' }
-      register: uninstall_string_search
+      register: product_code
       changed_when: false
-
-    - name: Uninstall 7-Zip using the found uninstall string (silent mode)
-      win_shell: |
-        $enc = '{{ uninstall_string_search.stdout | b64encode }}'
-        if ($enc -ne '') {
-          $u = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enc))
-          
-          # Convert the uninstall string to silent mode
-          if ($u -match 'msiexec(.exe)?') {
-            # For MSI installers, convert /I to /X and add silent flags
-            $u = $u -replace '/I', '/X'
-            if (-not ($u -match '/qn')) {
-              $u = "$u /qn /norestart"
-            }
-          } else {
-            # For exe installers (like 7z), try common silent flags
-            if (-not ($u -match '/S|/SILENT|/VERYSILENT')) {
-              $u = "$u /S"  # 7-Zip uses /S for silent
-            }
-          }
-          
-          Write-Output "Running silent uninstall: $u"
-          
-          # Run the uninstaller with a timeout
-          $job = Start-Job -ScriptBlock { 
-            param($cmd)
-            Invoke-Expression $cmd
-          } -ArgumentList $u
-          
-          # Wait up to 2 minutes
-          if (Wait-Job $job -Timeout 120) {
-            Receive-Job $job
-            Remove-Job $job
-            Write-Output "Uninstall completed"
-          } else {
-            Remove-Job $job -Force
-            throw "Uninstall timed out after 120 seconds"
-          }
-        } else {
-          Write-Output 'No uninstall string found; nothing to do.'
-        }
-      when: uninstall_string_search.stdout is defined and (uninstall_string_search.stdout | length) > 0
+      
+    - name: Uninstall 7-Zip using MSI product code
+      win_command: msiexec.exe /x "{{ product_code.stdout_lines[0] }}" /qn /norestart
+      when: product_code.stdout_lines | length > 0
       register: uninstall_result
-      failed_when: "'timed out' in (uninstall_result.stderr | default(''))"
-      changed_when: "'Running silent uninstall:' in (uninstall_result.stdout | default(''))"
-      async: 150  # Allow 2.5 minutes total
-      poll: 10    # Check every 10 seconds
+      async: 300
+      poll: 5
+      ignore_errors: true  # Continue even if the product is already uninstalled
