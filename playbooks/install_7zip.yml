@@ -7,31 +7,62 @@
   # Define the hosts where the tasks will be executed
   hosts: all
 
-  # Disable gathering facts to improve performance
-  gather_facts: no
+  # Gather facts so we can choose an appropriate temp directory per OS
+  gather_facts: yes
+
+  vars:
+    # Choose a sensible temp dir depending on the target OS
+    temp_dir: "{{ 'C:\\temp' if ansible_os_family == 'Windows' else '/tmp' }}"
+    # Path to the downloaded installer (handles Windows vs *nix path separators)
+    installer_path: "{{ temp_dir + ( '\\7z.msi' if ansible_os_family == 'Windows' else '/7z.msi') }}"
 
   # List of tasks to execute
   tasks:
-    # Ensure that the temporary folder exists
-    - name: Ensure temporary folder exists
+    # Ensure that the temporary folder exists (Windows)
+    - name: Ensure temporary folder exists (Windows)
       win_file:
-        path: C:\temp
+        path: "{{ temp_dir }}"
         state: directory
+      when: ansible_os_family == 'Windows'
 
-    # Download the 7-Zip package
-    - name: Download the 7-Zip package
+    # Ensure that the temporary folder exists (Unix-like)
+    - name: Ensure temporary folder exists (Unix)
+      file:
+        path: "{{ temp_dir }}"
+        state: directory
+      when: ansible_os_family != 'Windows'
+
+    # Download the 7-Zip package (Windows)
+    - name: Download the 7-Zip package (Windows)
       win_get_url:
         url: https://www.7-zip.org/a/7z2301-x64.msi
-        dest: C:\temp\7z.msi
+        dest: "{{ installer_path }}"
+      when: ansible_os_family == 'Windows'
 
-    # Ensure 7-Zip is installed through win_package
+    # Download the 7-Zip package (Unix-like)
+    - name: Download the 7-Zip package (Unix)
+      get_url:
+        url: https://www.7-zip.org/a/7z2301-x64.msi
+        dest: "{{ installer_path }}"
+      when: ansible_os_family != 'Windows'
+
+    # Ensure 7-Zip is installed (Windows only)
     - name: Ensure 7-Zip is installed
+      when: ansible_os_family == 'Windows'
       win_package:
-        path: C:\temp\7z.msi
+        path: "{{ installer_path }}"
         state: present
 
-    # Remove the downloaded 7-Zip package
-    - name: Remove the downloaded 7-Zip package
+    # Remove the downloaded 7-Zip package (Windows)
+    - name: Remove the downloaded 7-Zip package (Windows)
       win_file:
-        path: C:\temp\7z.msi
+        path: "{{ installer_path }}"
         state: absent
+      when: ansible_os_family == 'Windows'
+
+    # Remove the downloaded 7-Zip package (Unix-like)
+    - name: Remove the downloaded 7-Zip package (Unix)
+      file:
+        path: "{{ installer_path }}"
+        state: absent
+      when: ansible_os_family != 'Windows'

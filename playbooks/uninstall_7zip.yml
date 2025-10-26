@@ -8,7 +8,34 @@
   become_user: "Administrator"  # Specify the user to run as
   
   tasks:
-    - name: Uninstall 7-Zip
-      ansible.windows.win_package:
-        name: '7-Zip 23.01 (x64 edition)'
-        state: absent
+    - name: Locate 7-Zip uninstall string in registry
+      win_shell: |
+        $display = '7-Zip*'
+        $keys = @(
+          'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+          'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+          'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+        )
+        $found = $null
+        foreach ($k in $keys) {
+          $items = Get-ItemProperty -Path $k -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like $display }
+          if ($items) { $found = $items[0].UninstallString; break }
+        }
+        if ($found) { Write-Output $found } else { Write-Output '' }
+      register: uninstall_string_search
+      changed_when: false
+
+    - name: Uninstall 7-Zip using the found uninstall string
+      win_shell: |
+        $enc = '{{ uninstall_string_search.stdout | b64encode }}'
+        if ($enc -ne '') {
+          $u = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enc))
+          Write-Output "Running uninstall: $u"
+          Invoke-Expression $u
+        } else {
+          Write-Output 'No uninstall string found; nothing to do.'
+        }
+      when: uninstall_string_search.stdout is defined and (uninstall_string_search.stdout | length) > 0
+      register: uninstall_result
+      failed_when: false
+      changed_when: "'Running uninstall:' in (uninstall_result.stdout | default(''))"
