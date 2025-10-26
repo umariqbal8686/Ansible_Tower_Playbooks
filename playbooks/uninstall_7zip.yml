@@ -12,7 +12,7 @@
       win_shell: |
         $ErrorActionPreference = 'SilentlyContinue'
         
-        # Method 1: Direct registry check (faster)
+        # Method 1: Direct registry check
         $paths = @(
             'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
             'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
@@ -20,23 +20,13 @@
         
         foreach ($path in $paths) {
             $app = Get-ItemProperty $path | Where-Object { 
-                $_.DisplayName -like '7-Zip*' -and $_.UninstallString -like '*msiexec*'
+                $_.DisplayName -like '7-Zip*'
             } | Select-Object -First 1
             
-            if ($app) {
-                if ($app.UninstallString -match '{[A-F0-9-]+}') {
-                    $productCode = $matches[0]
-                    Write-Output "Found via Registry: $productCode"
-                    exit 0
-                }
+            if ($app -and $app.PSChildName) {
+                Write-Output $app.PSChildName
+                exit 0
             }
-        }
-        
-        # Method 2: WMI check (fallback)
-        $product = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like '7-Zip*' } | Select-Object -First 1
-        if ($product) {
-            Write-Output "Found via WMI: $($product.IdentifyingNumber)"
-            exit 0
         }
         
         Write-Output "NO_PRODUCT_FOUND"
@@ -45,17 +35,14 @@
 
     - name: Debug - Show found product code
       debug:
-        var: find_7zip.stdout_lines
+        var: find_7zip.stdout_lines[0]
       
-    - name: Uninstall 7-Zip using product code
-      win_command: >-
-        msiexec.exe /x "{{ find_7zip.stdout_lines[0] | regex_replace('^Found via (Registry|WMI): (.+)$', '\\2') }}"
-        /qn /norestart /l*v "C:\Windows\Temp\7zip_uninstall.log"
+    - name: Uninstall 7-Zip (if found)
+      win_package:
+        product_id: '{{ find_7zip.stdout_lines[0] }}'
+        state: absent
       when: find_7zip.stdout_lines[0] != "NO_PRODUCT_FOUND"
       register: uninstall_result
-      async: 300
-      poll: 5
-      ignore_errors: true
       
     - name: Show uninstall log if available
       win_shell: |
