@@ -2,6 +2,15 @@
 - name: Perform full system update, upgrade, and cleanup
   hosts: all
   become: yes  # Use sudo for all tasks
+
+  pre_tasks:
+    - name: Wait for apt lock to be released
+      ansible.builtin.command: while pgrep -f 'apt|dpkg'; do sleep 5; done
+      args:
+        executable: /bin/bash
+      changed_when: false
+      failed_when: false
+
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:
