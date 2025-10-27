@@ -1,0 +1,15 @@
+---
+- hosts: all
+  gather_facts: no
+  tasks:
+    - name: Whoami as normal user
+      command: whoami
+      register: normal_user
+    - name: Whoami as root
+      command: whoami
+      become: yes
+      register: root_user
+    - debug:
+        msg:
+          - "Normal user: {{ normal_user.stdout }}"
+          - "Root user: {{ root_user.stdout }}"
