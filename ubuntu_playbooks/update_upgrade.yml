@@ -1,51 +1,24 @@
 ---
-- name: Perform full system update, upgrade, and cleanup
-  hosts: all
-  become: yes  # Use sudo for all tasks
-
-  pre_tasks:
-    - name: Stop the apt-daily services
-      ansible.builtin.systemd:
-        name: "{{ item }}"
-        state: stopped
-        enabled: false
-      with_items:
-        - apt-daily.timer
-        - apt-daily-upgrade.timer
-      ignore_errors: true # Ignore if the timer is not running
+- hosts: all
+  gather_facts: yes
+  become: yes
 
   tasks:
-    - name: Update apt cache
+    - name: Perform a dist-upgrade.
       ansible.builtin.apt:
+        upgrade: dist
         update_cache: yes
-        cache_valid_time: 3600
 
-    - name: Perform full upgrade
-      ansible.builtin.apt:
-        upgrade: full
-      register: upgrade_result
+    - name: Check if a reboot is required.
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+        get_checksum: no
+      register: reboot_required_file
 
-    - name: Remove unused dependencies with autoremove
+    - name: Reboot the server (if required).
+      ansible.builtin.reboot:
+      when: reboot_required_file.stat.exists == true
+
+    - name: Remove dependencies that are no longer required.
       ansible.builtin.apt:
         autoremove: yes
-
-    - name: Clean up old package archives
-      ansible.builtin.apt:
-        autoclean: yes
-
-    - name: Reboot if kernel was updated
-      ansible.builtin.reboot:
-        msg: "Rebooting to apply kernel updates"
-        reboot_timeout: 600
-      when: upgrade_result.reboot_required | default(false)
-
-  post_tasks:
-    - name: Re-enable the apt-daily services
-      ansible.builtin.systemd:
-        name: "{{ item }}"
-        state: started
-        enabled: true
-      with_items:
-        - apt-daily.timer
-        - apt-daily-upgrade.timer
-      ignore_errors: true
