@@ -8,22 +8,27 @@
       ansible.builtin.apt:
         update_cache: yes
         cache_valid_time: 3600 # Cache for 1 hour
+      become: yes
 
     - name: Perform full upgrade
       ansible.builtin.apt:
         upgrade: full
       register: upgrade_result
+      become: yes
 
     - name: Remove unused dependencies with autoremove
       ansible.builtin.apt:
         autoremove: yes
+      become: yes
     
     - name: Clean up old package archives
       ansible.builtin.apt:
         autoclean: yes
+      become: yes
 
     - name: Reboot if kernel was updated
       ansible.builtin.reboot:
         msg: "Rebooting to apply kernel updates"
         reboot_timeout: 600
       when: upgrade_result.reboot_required | default(false)
+      become: yes
