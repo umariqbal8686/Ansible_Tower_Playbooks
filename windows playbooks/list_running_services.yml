@@ -1,0 +1,13 @@
+---
+- name: List all running Windows services
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Get all running services
+      win_shell: |
+        Get-Service | Where-Object {$_.Status -eq 'Running'} | Select-Object Name, DisplayName, Status | ConvertTo-Json
+      register: running_services
+
+    - name: Show running services
+      debug:
+        var: running_services.stdout
