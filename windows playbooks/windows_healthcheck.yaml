@@ -1,6 +1,6 @@
 ---
 - name: Perform comprehensive health check on Windows servers
-  hosts: windows_servers
+  hosts: all
   gather_facts: no # Disable automatic fact gathering
   tasks:
     - name: Ping the host to check WinRM connectivity
