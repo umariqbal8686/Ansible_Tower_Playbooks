@@ -8,6 +8,25 @@
       register: ping_result
       ignore_errors: yes
 
+    - name: Get OS details and report if any pending updates
+      ansible.windows.win_updates:
+        state: searched
+        category_names:
+          - CriticalUpdates
+          - SecurityUpdates
+          - UpdateRollups
+          - Updates
+      register: update_results
+      ignore_errors: yes
+
+    - name: Get system uptime (in days)
+      ansible.windows.win_shell: |
+        $LastBootUpTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
+        $Uptime = (New-TimeSpan -Start $LastBootUpTime -End (Get-Date)).TotalDays
+        Write-Output $Uptime
+      register: uptime_days
+      changed_when: false
+
     - name: Get disk space information
       ansible.windows.setup:
       register: disk_facts
@@ -25,14 +44,6 @@
       ansible.windows.win_shell: |
         Get-CimInstance -ClassName Win32_PerfFormattedData_PerfOS_Processor | Select-Object -ExpandProperty PercentProcessorTime | Measure-Object -Average
       register: cpu_usage
-      changed_when: false
-
-    - name: Get system uptime (in days)
-      ansible.windows.win_shell: |
-        $LastBootUpTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
-        $Uptime = (New-TimeSpan -Start $LastBootUpTime -End (Get-Date)).TotalDays
-        Write-Output $Uptime
-      register: uptime_days
       changed_when: false
 
     - name: Get detailed memory usage
@@ -85,3 +96,4 @@
       ansible.builtin.debug:
         msg: "{{ update_results.updates | length }} updates are pending installation."
       when: update_results.updates is defined
+
