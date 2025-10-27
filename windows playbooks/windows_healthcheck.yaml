@@ -33,12 +33,19 @@
       register: uptime_days
       changed_when: false
 
-    - name: Get critical service information
+    - name: Get information about critical services
       ansible.windows.win_service_info:
-        services:
-          - Spooler
-          - Winmgmt
-      register: service_info
+        name: "{{ item }}"
+      loop:
+        - Spooler
+        - Winmgmt
+      register: service_info_results
+
+    - name: Check status of critical services
+      ansible.builtin.debug:
+        msg: "WARNING: Service {{ item.item }} is not running (Current State: {{ item.services[0].state }})"
+      loop: "{{ service_info_results.results }}"
+      when: item.services[0].state != 'Running'
 
     - name: Display host and system information
       ansible.builtin.debug:
