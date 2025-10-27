@@ -1,0 +1,19 @@
+---
+- name: Simple update and upgrade
+  hosts: all
+  gather_facts: no
+  become: yes
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      
+    - name: Upgrade packages
+      apt:
+        upgrade: yes
+        
+    - name: Clean up
+      apt:
+        autoremove: yes
+        autoclean: yes

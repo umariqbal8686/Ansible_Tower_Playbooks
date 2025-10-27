@@ -3,3 +3,8 @@ all:
   hosts:
     ubuntu-cli-02:
       ansible_host: 10.20.30.203
+  vars:
+    ansible_connection: ssh
+    ansible_ssh_extra_args: '-o PreferredAuthentications=password -o PubkeyAuthentication=no -o ControlMaster=auto -o ControlPersist=60s'
+    ansible_become_flags: '-H -S'
+    timeout: 30
