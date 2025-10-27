@@ -21,17 +21,17 @@
 
     - name: Get CPU usage percentage via PowerShell
       ansible.windows.win_shell: |
-        Get-CimInstance -ClassName Win32_PerfFormattedData_PerfOS_Processor | Select-Object -ExpandProperty PercentProcessorTime | Measure-Object -Average
+        (Get-CimInstance -ClassName Win32_PerfFormattedData_PerfOS_Processor | Measure-Object -Property PercentProcessorTime -Average).Average
       register: cpu_usage
       changed_when: false
+      when: ansible_facts.os_name is defined
 
     - name: Get system uptime in days via PowerShell
       ansible.windows.win_shell: |
-        $LastBootUpTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
-        $Uptime = (New-TimeSpan -Start $LastBootUpTime -End (Get-Date)).TotalDays
-        Write-Output $Uptime
+        (New-TimeSpan -Start (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime -End (Get-Date)).TotalDays
       register: uptime_days
       changed_when: false
+      when: ansible_facts.os_name is defined
 
     - name: Get information about critical services
       ansible.windows.win_service_info:
@@ -40,25 +40,25 @@
         - Spooler
         - Winmgmt
       register: service_info_results
+      when: ansible_facts.os_name is defined
 
-    - name: Check status of critical services
-      ansible.builtin.debug:
-        msg: "WARNING: Service {{ item.item }} is not running (Current State: {{ item.services[0].state }})"
-      loop: "{{ service_info_results.results }}"
-      when: item.services[0].state != 'Running'
-
-    - name: Display host and system information
+    - name: Display health check report
       ansible.builtin.debug:
         msg: |
           --- Health Check Report for {{ ansible_hostname }} ---
-          Connectivity Status: {{ 'OK' if not ping_result.failed else 'FAILED' }}
+          Connectivity: {{ 'OK' if not ping_result.failed else 'FAILED' }}
+          {% if ansible_facts.os_name is defined %}
           OS Name: {{ ansible_facts.os_name }}
           OS Version: {{ ansible_facts.os_version }}
           OS Build: {{ ansible_facts.product_build }}
-          System Uptime: {{ uptime_days.stdout | round(2) }} days
+          {% else %}
+          OS details not available (fact gathering may have failed).
+          {% endif %}
+          System Uptime: {{ uptime_days.stdout | float | round(2) }} days
           Average CPU Usage: {{ cpu_usage.stdout | replace(',', '.') | float | round(2) }}%
           Total Memory: {{ (ansible_facts.memtotal_mb / 1024) | round(2) }} GB
           Free Memory: {{ (ansible_facts.memfree_mb / 1024) | round(2) }} GB
+      when: ping_result is defined and not ping_result.failed
 
     - name: Display disk space usage and check for low space
       ansible.builtin.debug:
@@ -69,13 +69,13 @@
           WARNING: Low disk space on {{ mount.mount }}.
           {% endif %}
           {% endfor %}
-      when: ansible_facts.mounts | length > 0
+      when: ansible_facts.mounts is defined
 
-    - name: Check status of specific critical services
+    - name: Check status of critical services
       ansible.builtin.debug:
-        msg: "WARNING: Service {{ item.name }} is not running (Current State: {{ item.state }})"
-      loop: "{{ service_info.services }}"
-      when: item.state != 'Running'
+        msg: "WARNING: Service {{ item.item }} is not running (Current State: {{ item.services[0].state }})"
+      loop: "{{ service_info_results.results }}"
+      when: item.services[0].state != 'Running'
 
     - name: Report on pending Windows updates
       ansible.builtin.debug:
@@ -85,4 +85,4 @@
     - name: Report no pending updates found
       ansible.builtin.debug:
         msg: "No pending updates found."
-      when: not (update_check.updates is defined and update_check.updates | length > 0)
+      when: update_check.updates is defined and update_check.updates | length == 0
