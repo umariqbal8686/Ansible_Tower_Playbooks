@@ -1,6 +1,6 @@
 ---
 - name: Perform comprehensive health check on Windows servers
-  hosts: all
+  hosts: windows_servers
   gather_facts: no # Disable automatic fact gathering
   tasks:
     - name: Ping the host to check WinRM connectivity
@@ -17,83 +17,83 @@
       ansible.builtin.setup:
       when: not ping_test.failed
       register: gather_facts_result
+
+    - name: Get CPU usage percentage via PowerShell
+      ansible.windows.win_shell: |
+        (Get-CimInstance -ClassName Win32_PerfFormattedData_PerfOS_Processor | Measure-Object -Property PercentProcessorTime -Average).Average
+      register: cpu_usage
+      changed_when: false
+      when: not ping_test.failed and 'ansible_facts' in gather_facts_result
+
+    - name: Get system uptime in days via PowerShell
+      ansible.windows.win_shell: |
+        (New-TimeSpan -Start (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime -End (Get-Date)).TotalDays
+      register: uptime_days
+      changed_when: false
+      when: not ping_test.failed and 'ansible_facts' in gather_facts_result
+
+    - name: Get information about critical services
+      ansible.windows.win_service_info:
+        name: "{{ item }}"
+      loop:
+        - Spooler
+        - Winmgmt
+      register: service_info_results
+      when: not ping_test.failed and 'ansible_facts' in gather_facts_result
+
+    - name: Check for pending Windows updates
+      ansible.windows.win_updates:
+        state: searched
+        category_names:
+          - CriticalUpdates
+          - SecurityUpdates
+          - UpdateRollups
+          - Updates
+      register: update_check
       ignore_errors: true
+      when: not ping_test.failed and 'ansible_facts' in gather_facts_result
 
-    - name: Block for tasks that rely on facts
-      when: gather_facts_result is not failed
-      block:
-        - name: Get CPU usage percentage via PowerShell
-          ansible.windows.win_shell: |
-            (Get-CimInstance -ClassName Win32_PerfFormattedData_PerfOS_Processor | Measure-Object -Property PercentProcessorTime -Average).Average
-          register: cpu_usage
-          changed_when: false
+    - name: Display health check report
+      ansible.builtin.debug:
+        msg: |
+          --- Health Check Report for {{ ansible_hostname }} ---
+          Connectivity: OK
+          {% if 'ansible_facts' in gather_facts_result %}
+          OS Name: {{ ansible_facts.os_name }}
+          OS Version: {{ ansible_facts.os_version }}
+          OS Build: {{ ansible_facts.product_build }}
+          System Uptime: {{ uptime_days.stdout | float | round(2) }} days
+          Average CPU Usage: {{ cpu_usage.stdout | replace(',', '.') | float | round(2) }}%
+          Total Memory: {{ (ansible_facts.memtotal_mb / 1024) | round(2) }} GB
+          Free Memory: {{ (ansible_facts.memfree_mb / 1024) | round(2) }} GB
+          {% else %}
+          WARNING: Fact gathering failed. System information is incomplete.
+          {% endif %}
+      when: not ping_test.failed
 
-        - name: Get system uptime in days via PowerShell
-          ansible.windows.win_shell: |
-            (New-TimeSpan -Start (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime -End (Get-Date)).TotalDays
-          register: uptime_days
-          changed_when: false
+    - name: Display disk space usage and check for low space
+      ansible.builtin.debug:
+        msg: |
+          {% for mount in ansible_facts.mounts %}
+          Drive {{ mount.mount }} has {{ (mount.size_available / 1024**3) | round(2) }} GB free of {{ (mount.size_total / 1024**3) | round(2) }} GB total ({{ (mount.size_available / mount.size_total * 100) | round(2) }}% free).
+          {% if (mount.size_available / mount.size_total * 100) < 10 %}
+          WARNING: Low disk space on {{ mount.mount }}.
+          {% endif %}
+          {% endfor %}
+      when: not ping_test.failed and ansible_facts.mounts is defined
 
-        - name: Get information about critical services
-          ansible.windows.win_service_info:
-            name: "{{ item }}"
-          loop:
-            - Spooler
-            - Winmgmt
-          register: service_info_results
+    - name: Check status of critical services
+      ansible.builtin.debug:
+        msg: "WARNING: Service {{ item.item }} is not running (Current State: {{ item.services.state }})"
+      loop: "{{ service_info_results.results }}"
+      when: not ping_test.failed and item.services.state != 'Running'
 
-        - name: Check for pending Windows updates
-          ansible.windows.win_updates:
-            state: searched
-            category_names:
-              - CriticalUpdates
-              - SecurityUpdates
-              - UpdateRollups
-              - Updates
-          register: update_check
-          ignore_errors: true
+    - name: Report on pending Windows updates
+      ansible.builtin.debug:
+        msg: "{{ update_check.updates | length }} updates are pending installation."
+      when: not ping_test.failed and update_check.updates is defined and update_check.updates | length > 0
 
-        - name: Display health check report
-          ansible.builtin.debug:
-            msg: |
-              --- Health Check Report for {{ ansible_hostname }} ---
-              Connectivity: OK
-              OS Name: {{ ansible_facts.os_name }}
-              OS Version: {{ ansible_facts.os_version }}
-              OS Build: {{ ansible_facts.product_build }}
-              System Uptime: {{ uptime_days.stdout | float | round(2) }} days
-              Average CPU Usage: {{ cpu_usage.stdout | replace(',', '.') | float | round(2) }}%
-              Total Memory: {{ (ansible_facts.memtotal_mb / 1024) | round(2) }} GB
-              Free Memory: {{ (ansible_facts.memfree_mb / 1024) | round(2) }} GB
-
-        - name: Display disk space usage and check for low space
-          ansible.builtin.debug:
-            msg: |
-              {% for mount in ansible_facts.mounts %}
-              Drive {{ mount.mount }} has {{ (mount.size_available / 1024**3) | round(2) }} GB free of {{ (mount.size_total / 1024**3) | round(2) }} GB total ({{ (mount.size_available / mount.size_total * 100) | round(2) }}% free).
-              {% if (mount.size_available / mount.size_total * 100) < 10 %}
-              WARNING: Low disk space on {{ mount.mount }}.
-              {% endif %}
-              {% endfor %}
-          when: ansible_facts.mounts is defined
-
-        - name: Check status of critical services
-          ansible.builtin.debug:
-            msg: "WARNING: Service {{ item.item }} is not running (Current State: {{ item.services.state }})"
-          loop: "{{ service_info_results.results }}"
-          when: item.services.state != 'Running'
-
-        - name: Report on pending Windows updates
-          ansible.builtin.debug:
-            msg: "{{ update_check.updates | length }} updates are pending installation."
-          when: update_check.updates is defined and update_check.updates | length > 0
-
-        - name: Report no pending updates found
-          ansible.builtin.debug:
-            msg: "No pending updates found."
-          when: update_check.updates is defined and update_check.updates | length == 0
-
-      rescue:
-        - name: Report fact gathering failure
-          ansible.builtin.debug:
-            msg: "WARNING: Fact gathering failed on {{ inventory_hostname }}. System information is incomplete."
+    - name: Report no pending updates found
+      ansible.builtin.debug:
+        msg: "No pending updates found."
+      when: not ping_test.failed and update_check.updates is defined and update_check.updates | length == 0
