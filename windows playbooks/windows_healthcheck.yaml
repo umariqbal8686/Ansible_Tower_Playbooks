@@ -1,6 +1,6 @@
 ---
 - name: Perform comprehensive health check on Windows servers
-  hosts: windows_servers
+  hosts: all
   gather_facts: yes
   tasks:
     - name: Ping the host to check WinRM connectivity
