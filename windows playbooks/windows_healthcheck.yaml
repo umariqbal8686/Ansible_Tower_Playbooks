@@ -31,6 +31,15 @@
       changed_when: false
       when: not ping_test.failed
 
+    - name: Get information about critical services
+      ansible.windows.win_service_info:
+        name: "{{ item }}"
+      loop:
+        - Spooler
+        - Winmgmt
+      register: service_info_results
+      when: not ping_test.failed
+
     - name: Check for pending Windows updates
       ansible.windows.win_updates:
         state: searched
@@ -41,15 +50,6 @@
           - Updates
       register: update_check
       ignore_errors: true
-      when: not ping_test.failed
-
-    - name: Get information about critical services
-      ansible.windows.win_service_info:
-        name: "{{ item }}"
-      loop:
-        - Spooler
-        - Winmgmt
-      register: service_info_results
       when: not ping_test.failed
 
     - name: Display health check report
@@ -81,14 +81,14 @@
       ansible.builtin.debug:
         msg: "WARNING: Service {{ item.item }} is not running (Current State: {{ item.services.state }})"
       loop: "{{ service_info_results.results }}"
-      when: item.services.state != 'Running' and not ping_test.failed
+      when: not ping_test.failed and item.services.state != 'Running'
 
     - name: Report on pending Windows updates
       ansible.builtin.debug:
         msg: "{{ update_check.updates | length }} updates are pending installation."
-      when: update_check.updates is defined and update_check.updates | length > 0
+      when: not ping_test.failed and update_check.updates is defined and update_check.updates | length > 0
 
     - name: Report no pending updates found
       ansible.builtin.debug:
         msg: "No pending updates found."
-      when: not (update_check.updates is defined and update_check.updates | length > 0)
+      when: not ping_test.failed and update_check.updates is defined and update_check.updates | length == 0
