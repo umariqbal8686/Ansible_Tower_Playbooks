@@ -4,12 +4,15 @@
   become: yes  # Use sudo for all tasks
 
   pre_tasks:
-    - name: Wait for apt lock to be released
-      ansible.builtin.command: while pgrep -f 'apt|dpkg'; do sleep 5; done
-      args:
-        executable: /bin/bash
-      changed_when: false
-      failed_when: false
+    - name: Stop the apt-daily services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      with_items:
+        - apt-daily.timer
+        - apt-daily-upgrade.timer
+      ignore_errors: true # Ignore if the timer is not running
 
   tasks:
     - name: Update apt cache
@@ -35,3 +38,14 @@
         msg: "Rebooting to apply kernel updates"
         reboot_timeout: 600
       when: upgrade_result.reboot_required | default(false)
+
+  post_tasks:
+    - name: Re-enable the apt-daily services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      with_items:
+        - apt-daily.timer
+        - apt-daily-upgrade.timer
+      ignore_errors: true
