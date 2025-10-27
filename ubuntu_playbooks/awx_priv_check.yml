@@ -1,0 +1,51 @@
+---
+- name: AWX privilege escalation diagnostic
+  hosts: all
+  gather_facts: no
+  vars:
+    ansible_shell_executable: /bin/bash
+  tasks:
+    - name: Show current user (no become)
+      command: whoami
+      register: whoami_normal
+
+    - name: Show current user with become
+      command: whoami
+      become: yes
+      register: whoami_become
+      ignore_errors: yes
+
+    - name: Show sudo privileges (sudo -l)
+      command: sudo -l
+      register: sudo_list
+      ignore_errors: yes
+      no_log: true
+
+    - name: Attempt a non-interactive sudo check (sudo -n true)
+      command: sudo -n true
+      register: sudo_noninteractive
+      ignore_errors: yes
+
+    - name: Try apt-get update (simulation) with become
+      command: apt-get update -s
+      become: yes
+      register: apt_sim
+      ignore_errors: yes
+
+    - name: Debug results (safe fields)
+      debug:
+        msg:
+          - "whoami_normal: {{ whoami_normal.stdout }}"
+          - "whoami_become: {{ whoami_become.stdout | default('ERROR') }}"
+          - "sudo_noninteractive rc: {{ sudo_noninteractive.rc }}"
+          - "apt_sim stdout|stderr lines length: stdout={{ apt_sim.stdout_lines | length if apt_sim.stdout_lines is defined else 0 }}, stderr={{ apt_sim.stderr_lines | length if apt_sim.stderr_lines is defined else 0 }}"
+
+    - name: If apt simulation shows permission denied, show apt stderr
+      debug:
+        var: apt_sim.stderr_lines
+      when: apt_sim.stderr is defined and ('Permission denied' in (apt_sim.stderr | string) or 'Could not open lock file' in (apt_sim.stderr | string))
+
+    - name: Fail with hint if sudo not working
+      fail:
+        msg: "Privilege escalation failed: whoami with become returned {{ whoami_become.stdout | default('none') }}; sudo -n rc={{ sudo_noninteractive.rc }}. Check AWX Job Template 'Enable Privilege Escalation' and Credential 'Privilege Escalation Password'."
+      when: whoami_become.stdout is not defined or whoami_become.stdout == whoami_normal.stdout
