@@ -1,114 +1,29 @@
 ---
-# Playbook to update and upgrade Ubuntu systems
-- name: Update and upgrade Ubuntu systems
+- name: Perform full system update, upgrade, and cleanup
   hosts: all
-  become: yes
-  become_method: sudo
-  become_user: root
-  gather_facts: no  # Disable initial fact gathering to avoid timeout
-  vars:
-    ansible_command_timeout: 30
-    ansible_connect_timeout: 30
-    ansible_timeout: 30
-
-  pre_tasks:
-    - name: Gather facts
-      setup:
-      vars:
-        ansible_become: no  # Don't use sudo for fact gathering
-
-    - name: Test sudo access
-      command: whoami
-      changed_when: false
-      register: sudo_test
-      ignore_errors: yes
+  become: true # Use 'become: true' to run tasks with sudo privileges
   
   tasks:
-    - name: Verify we're running on Ubuntu
-      fail:
-        msg: "This playbook only supports Ubuntu systems. Current OS is {{ ansible_distribution }}"
-      when: ansible_distribution != "Ubuntu"
-
     - name: Update apt cache
-      apt:
+      ansible.builtin.apt:
         update_cache: yes
-        cache_valid_time: 3600  # Consider cache valid if updated within last hour
-      register: apt_update
-      
-    - name: Show available updates
-      shell: /usr/lib/update-notifier/apt-check --human-readable
-      register: updates_available
-      changed_when: false
-      
-    - name: Display available updates
-      debug:
-        var: updates_available.stdout_lines
-        
-    - name: Upgrade all packages
-      apt:
-        upgrade: dist  # Equivalent to 'apt full-upgrade'
-        autoclean: yes  # Remove cached package files for uninstalled packages
-        autoremove: yes  # Remove dependencies that are no longer needed
+        cache_valid_time: 3600 # Cache for 1 hour
+
+    - name: Perform full upgrade
+      ansible.builtin.apt:
+        upgrade: full
       register: upgrade_result
-      
-    - name: Show upgrade summary
-      debug:
-        msg: 
-          - "Packages upgraded: {{ upgrade_result.upgraded | default(0) }}"
-          - "Packages newly installed: {{ upgrade_result.installed | default(0) }}"
-          - "Packages removed: {{ upgrade_result.removed | default(0) }}"
-      when: upgrade_result.changed
 
-    # Thorough system cleanup after upgrade
-    - name: Clean package cache
-      apt:
-        clean: yes
-        autoclean: yes
-      
-    - name: Remove unused dependencies
-      apt:
+    - name: Remove unused dependencies with autoremove
+      ansible.builtin.apt:
         autoremove: yes
-        purge: yes  # Also remove configuration files
-      register: autoremove_result
+    
+    - name: Clean up old package archives
+      ansible.builtin.apt:
+        autoclean: yes
 
-    - name: Remove old kernel packages
-      shell: |
-        current_kernel=$(uname -r)
-        dpkg --list 'linux-*' | awk '/^ii/{ print $2}' | grep -v -e $(uname -r | sed -r 's/-[a-z]+//') | xargs apt-get -y purge || true
-      register: kernel_cleanup
-      changed_when: kernel_cleanup.stdout != ""
-      failed_when: false  # Don't fail if no old kernels found
-
-    - name: Clean up downloaded package files
-      shell: |
-        apt-get clean
-        rm -rf /var/lib/apt/lists/*
-      register: cleanup_result
-      changed_when: true  # This always does cleaning
-
-    - name: Show cleanup results
-      debug:
-        msg: 
-          - "Packages autoremoved: {{ autoremove_result.removed | default([]) | length }}"
-          - "Package cache and lists cleaned"
-          - "Old kernels checked and cleaned if found"
-
-    - name: Check if reboot is required
-      stat:
-        path: /var/run/reboot-required
-      register: reboot_required
-      
-    - name: Notify if reboot is required
-      debug:
-        msg: "*** System requires a reboot ***"
-      when: reboot_required.stat.exists
-
-    # Optional: Automatically reboot if required (commented out for safety)
-    - name: Reboot system if required
-      reboot:
-        msg: "Rebooting system due to package updates"
-        connect_timeout: 5
-        reboot_timeout: 300
-        pre_reboot_delay: 0
-        post_reboot_delay: 30
-      when: reboot_required.stat.exists
+    - name: Reboot if kernel was updated
+      ansible.builtin.reboot:
+        msg: "Rebooting to apply kernel updates"
+        reboot_timeout: 600
+      when: upgrade_result.reboot_required | default(false)
