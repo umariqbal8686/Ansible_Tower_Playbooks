@@ -1,26 +1,43 @@
 ---
 - hosts: all
   gather_facts: yes
-  vars:
-    ansible_host_key_checking: false
-  become: true
+  become: yes
 
   tasks:
-    - name: Update and upgrade apt packages
-      apt:
+    - name: Update apt cache
+      ansible.builtin.apt:
         update_cache: yes
-        upgrade: yes
+        cache_valid_time: 3600
 
-    - name: Check if a reboot is required.
+    - name: Upgrade all packages
+      ansible.builtin.apt:
+        upgrade: dist
+      register: upgrade_result
+
+    - name: Show upgrade summary
+      debug:
+        msg:
+          - "Packages upgraded: {{ upgrade_result.upgraded | default(0) }}"
+          - "Packages newly installed: {{ upgrade_result.installed | default(0) }}"
+          - "Packages removed: {{ upgrade_result.removed | default(0) }}"
+      when: upgrade_result is defined
+
+    - name: Remove unused dependencies
+      ansible.builtin.apt:
+        autoremove: yes
+
+    - name: Clean up old package archives
+      ansible.builtin.apt:
+        autoclean: yes
+
+    - name: Check if a reboot is required
       ansible.builtin.stat:
         path: /var/run/reboot-required
         get_checksum: no
       register: reboot_required_file
 
-    - name: Reboot the server (if required).
+    - name: Reboot the server if required
       ansible.builtin.reboot:
-      when: reboot_required_file.stat.exists == true
-
-    - name: Remove dependencies that are no longer required.
-      ansible.builtin.apt:
-        autoremove: yes
+        msg: "Rebooting to apply updates"
+        reboot_timeout: 600
+      when: reboot_required_file.stat.exists
