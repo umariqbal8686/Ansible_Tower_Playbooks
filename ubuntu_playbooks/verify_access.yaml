@@ -1,15 +1,13 @@
 ---
-- hosts: all
+- name: Verify sudo as admin01
+  hosts: all
   gather_facts: no
+  become: yes
+
   tasks:
-    - name: Whoami as normal user
+    - name: Whoami with sudo
       command: whoami
-      register: normal_user
-    - name: Whoami as root
-      command: whoami
-      become: yes
-      register: root_user
+      register: whoami_result
+
     - debug:
-        msg:
-          - "Normal user: {{ normal_user.stdout }}"
-          - "Root user: {{ root_user.stdout }}"
+        var: whoami_result.stdout
