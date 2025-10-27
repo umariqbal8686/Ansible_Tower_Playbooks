@@ -1,13 +1,15 @@
 ---
 - hosts: all
   gather_facts: yes
-  become: yes
+  vars:
+    ansible_host_key_checking: false
+  become: true
 
   tasks:
-    - name: Perform a dist-upgrade.
-      ansible.builtin.apt:
-        upgrade: dist
+    - name: Update and upgrade apt packages
+      apt:
         update_cache: yes
+        upgrade: yes
 
     - name: Check if a reboot is required.
       ansible.builtin.stat:
