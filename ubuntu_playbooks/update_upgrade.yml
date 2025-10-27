@@ -2,8 +2,23 @@
 # Playbook to update and upgrade Ubuntu systems
 - name: Update and upgrade Ubuntu systems
   hosts: all  # Will use the hosts from inventory
-  become: yes  # Will use credentials from AWX
+  become: yes
+  become_method: sudo
+  become_flags: 'NOPASSWD: ALL'  # Try to use sudo without password
+  become_user: root
   gather_facts: true  # Need facts for OS verification
+  
+  pre_tasks:
+    - name: Ensure admin01 has sudo privileges without password
+      lineinfile:
+        path: /etc/sudoers.d/admin01
+        line: "admin01 ALL=(ALL) NOPASSWD: ALL"
+        create: yes
+        mode: '0440'
+        validate: '/usr/sbin/visudo -cf %s'
+      become: yes
+      become_method: sudo
+      ignore_errors: yes  # Continue even if this fails
   
   tasks:
     - name: Verify we're running on Ubuntu

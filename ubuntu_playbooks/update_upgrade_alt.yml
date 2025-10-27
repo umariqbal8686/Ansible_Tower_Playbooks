@@ -1,0 +1,33 @@
+---
+# Alternative version using su instead of sudo
+- name: Update and upgrade Ubuntu systems
+  hosts: all
+  become: yes
+  become_method: su
+  gather_facts: true
+
+  tasks:
+    - name: Verify we're running on Ubuntu
+      fail:
+        msg: "This playbook only supports Ubuntu systems. Current OS is {{ ansible_distribution }}"
+      when: ansible_distribution != "Ubuntu"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        autoclean: yes
+        autoremove: yes
+      register: upgrade_result
+
+    - name: Show upgrade summary
+      debug:
+        msg: 
+          - "Packages upgraded: {{ upgrade_result.upgraded | default(0) }}"
+          - "Packages newly installed: {{ upgrade_result.installed | default(0) }}"
+          - "Packages removed: {{ upgrade_result.removed | default(0) }}"
+      when: upgrade_result.changed
