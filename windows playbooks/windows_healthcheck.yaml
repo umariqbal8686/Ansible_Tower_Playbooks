@@ -1,0 +1,87 @@
+---
+- name: Perform comprehensive health check on Windows servers
+  hosts: windows_servers
+  gather_facts: yes
+  tasks:
+    - name: Ping the host to check connectivity
+      ansible.windows.win_ping:
+      register: ping_result
+      ignore_errors: yes
+
+    - name: Get disk space information
+      ansible.windows.setup:
+      register: disk_facts
+
+    - name: Get information about critical services (e.g., Spooler, Winmgmt)
+      ansible.windows.win_service_info:
+      register: service_info
+
+    - name: Get list of installed Windows updates
+      ansible.windows.win_updates:
+        state: searched
+      register: update_results
+
+    - name: Get CPU usage percentage
+      ansible.windows.win_shell: |
+        Get-CimInstance -ClassName Win32_PerfFormattedData_PerfOS_Processor | Select-Object -ExpandProperty PercentProcessorTime | Measure-Object -Average
+      register: cpu_usage
+      changed_when: false
+
+    - name: Get system uptime (in days)
+      ansible.windows.win_shell: |
+        $LastBootUpTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
+        $Uptime = (New-TimeSpan -Start $LastBootUpTime -End (Get-Date)).TotalDays
+        Write-Output $Uptime
+      register: uptime_days
+      changed_when: false
+
+    - name: Get detailed memory usage
+      ansible.windows.win_shell: |
+        Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object -Property TotalVisibleMemorySize,FreePhysicalMemory | ConvertTo-Json
+      register: mem_usage_raw
+      changed_when: false
+
+    - name: Parse memory usage JSON
+      ansible.builtin.set_fact:
+        mem_usage: "{{ mem_usage_raw.stdout | from_json }}"
+
+    - name: Display host connectivity status
+      ansible.builtin.debug:
+        msg: "Connectivity status for {{ ansible_hostname }}: {{ ping_result }}"
+
+    - name: Display system info: CPU, memory, and uptime
+      ansible.builtin.debug:
+        msg:
+          - "System Uptime: {{ uptime_days.stdout | round(2) }} days"
+          - "Average CPU Usage: {{ cpu_usage.stdout | replace(',', '.') | float | round(2) }}%"
+          - "Total Memory: {{ (mem_usage.TotalVisibleMemorySize / 1024) | round(2) }} MB"
+          - "Free Memory: {{ (mem_usage.FreePhysicalMemory / 1024) | round(2) }} MB"
+
+    - name: Display disk space usage for each volume
+      ansible.builtin.debug:
+        msg: >
+          Drive {{ item.mount }} has {{ (item.size_available / 1024**3) | round(2) }} GB
+          of free space remaining.
+      loop: "{{ disk_facts.ansible_facts.ansible_mounts }}"
+      when: item.mount is defined
+
+    - name: Warn if disk space is low (less than 10%)
+      ansible.builtin.debug:
+        msg: "WARNING: Low disk space on {{ item.mount }} ({{ (item.size_available / item.size_total * 100) | round(2) }}% free)"
+      loop: "{{ disk_facts.ansible_facts.ansible_mounts }}"
+      when:
+        - item.size_available is defined
+        - (item.size_available / item.size_total * 100) < 10
+
+    - name: Check status of specific critical services
+      ansible.builtin.debug:
+        msg: "Service {{ item.name }} is in state: {{ item.state }}"
+      loop: "{{ service_info.services }}"
+      when:
+        - item.name in ['Spooler', 'Winmgmt']
+        - item.state != 'Running'
+
+    - name: Display count of pending Windows updates
+      ansible.builtin.debug:
+        msg: "{{ update_results.updates | length }} updates are pending installation."
+      when: update_results.updates is defined
